@@ -15,7 +15,7 @@ exception Exit of int
 let errf f =
   print_flush ();
   open_vbox 0;
-  open_hvbox 0; f (); print_cut (); close_box (); print_newline ();
+  open_hvbox 0; f (); close_box (); print_newline ();
   raise (Exit 1)
 
 let print_info = function

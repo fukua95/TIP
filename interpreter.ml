@@ -81,7 +81,9 @@ and interp_ref genv env (store, next) = function
   | exp -> error (get_exp_info exp) "Not a left-value expression"
 
 and interp_exp genv env (store, next) = function
-  | EIdentifier (x, _) -> Hashtbl.find store (Hashtbl.find env x)
+  | EIdentifier (x, fi) ->
+    let l = Hashtbl.find env x in
+    (try Hashtbl.find store l with Not_found -> error fi "Uninitialized variable")
   | ENumber (n, _) -> VInt n
   | EInput _ -> VInt (read_int ())
   | ENull _ -> VNull
