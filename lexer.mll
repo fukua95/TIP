@@ -15,6 +15,7 @@ let reserved_words = [
   ("output", fun i -> Parser.OUTPUT i);
   ("alloc", fun i -> Parser.ALLOC i);
   ("null", fun i -> Parser.NULL i);
+  ("error", fun i -> Parser.ERROR i);
 
   ("(", fun i -> Parser.LPAREN i);
   (")", fun i -> Parser.RPAREN i);
@@ -40,6 +41,7 @@ let create_id i str =
   with _ -> Parser.ID { i = i; v = str }
 
 let line_no = ref 1
+and depth = ref 0
 and start = ref 0
 
 and file_name = ref ""
@@ -64,6 +66,7 @@ rule main =
   | while+ { main lexbuf }
   | while*("\r")?"\n" { new_line lexbuf; main lexbuf }
   | "//" { comment lexbuf; main lexbuf }
+  | "/*" { depth := 1; mcomment lexbuf; main lexbuf }
   | ['0'-'9']+ { Parser.INTV { i = get_info lexbuf; v = int_of_string (text lexbuf) } }
   | id { create_id (get_info lexbuf) (text lexbuf) }
   | "==" { create_id (get_info lexbuf) (text lexbuf) }
@@ -74,3 +77,10 @@ and comment =
   parse
   | [^ '\n'] { comment lexbuf }
   | "\n" { new_line lexbuf }
+
+and mcomment =
+  parse
+  | "/*" { incr depth; mcomment lexbuf }
+  | "*/" { decr depth; if !depth > 0 then mcomment lexbuf }
+  | [^ '\n'] { mcomment lexbuf }
+  | "\n" { new_line lexbuf; mcomment lexbuf }

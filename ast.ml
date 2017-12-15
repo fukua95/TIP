@@ -28,6 +28,7 @@ type stmt =
   | SIf of exp * stmt * stmt option * info
   | SOutput of exp * info
   | SWhile of exp * stmt * info
+  | SError of exp * info
 
 type decl = string * string list * string list * stmt * exp * info
 

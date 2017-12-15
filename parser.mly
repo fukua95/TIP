@@ -14,6 +14,7 @@ module Option = BatOption
 %token <Ast.info> OUTPUT
 %token <Ast.info> ALLOC
 %token <Ast.info> NULL
+%token <Ast.info> ERROR
 
 %token <string Ast.with_info> ID
 %token <int Ast.with_info> INTV
@@ -44,8 +45,8 @@ prog:
   ;
 
 decl:
-  | fname = ID; LPAREN; params = separated_list(COMMA, ID); RPAREN; LCURLY; var_decl = option(var_decl); body = list(stmt); RETURN; ret = exp; SEMI; RCURLY
-    { (fname.v, List.map (fun param -> param.v) params, Option.default [] var_decl, SBlock (body, dummy_info), ret, fname.i) }
+  | fname = ID; LPAREN; params = separated_list(COMMA, ID); RPAREN; LCURLY; var_decls = list(var_decl); body = list(stmt); RETURN; ret = exp; SEMI; RCURLY
+    { (fname.v, List.map (fun param -> param.v) params, List.concat var_decls, SBlock (body, dummy_info), ret, fname.i) }
   ;
 
 var_decl:
@@ -60,10 +61,12 @@ stmt:
     { SBlock (stmts, fi) }
   | fi = IF; LPAREN; cond = exp; RPAREN; thens = stmt; elses = option(else_branch)
     { SIf (cond, thens, elses, fi) }
-  | fi = OUTPUT; LPAREN; exp = exp; RPAREN; SEMI
+  | fi = OUTPUT; exp = exp; SEMI
     { SOutput (exp, fi) }
   | fi = WHILE; LPAREN; cond = exp; RPAREN; body = stmt
     { SWhile (cond, body, fi) }
+  | fi = ERROR; exp = exp; SEMI
+    { SError (exp, fi) }
   ;
 
 else_branch:
@@ -117,6 +120,8 @@ atom:
     { EUnop (Ref, atom, fi) }
   | fi = STAR; atom = atom
     { EUnop (Deref, atom, fi) }
+  | fi = MINUS; num = INTV
+    { ENumber (- num.v, num.i) }
   | LPAREN; exp = exp; RPAREN
     { exp }
   ;
