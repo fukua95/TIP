@@ -1,4 +1,6 @@
 open Batteries
+open Format
+open Ast
 
 let search_path = ref [""]
 
@@ -18,15 +20,29 @@ let parse_args () =
   | None -> failwith "You must specify an input file"
   | Some s -> s
 
+let open_file in_file =
+  let rec try_next = function
+    | [] -> err ("Could not find " ^ in_file)
+    | d :: rest ->
+      let name = if d = "" then in_file else Filename.concat d in_file in
+      try open_in name with Sys_error m -> try_next rest
+  in
+  try_next !search_path
+
 let parse_file in_file =
-  let pi = open_in in_file in
+  let pi = open_file in_file in
   let lexbuf = Lexer.create in_file pi in
-  let result = Parser.prog Lexer.main lexbuf in
-  Parsing.clear_parser (); close_in pi; result
+  let result = try Parser.prog Lexer.main lexbuf with Parser.Error -> error (Lexer.get_info lexbuf) "Parse error" in
+  close_in pi; result
 
 let main () =
   let in_file = parse_args () in
   let _ = parse_file in_file in
   ()
 
-let () = main ()
+let () = set_max_boxes 1000
+let () = set_margin 67
+let res =
+  Printexc.catch (fun () -> try main (); 0 with Exit x -> x) ()
+let () = print_flush ()
+let () = exit res

@@ -45,6 +45,7 @@ and depth = ref 0
 and start = ref 0
 
 and file_name = ref ""
+and start_lex = ref dummy_info
 
 let create in_file stream =
   if not (Filename.is_implicit in_file) then file_name := in_file
@@ -65,16 +66,19 @@ rule main =
   parse
   | while+ { main lexbuf }
   | while*("\r")?"\n" { new_line lexbuf; main lexbuf }
-  | "//" { comment lexbuf; main lexbuf }
-  | "/*" { depth := 1; mcomment lexbuf; main lexbuf }
+  | "//" { start_lex := get_info lexbuf; comment lexbuf; main lexbuf }
+  | "*/" { error (get_info lexbuf) "Unmatched end of comment" }
+  | "/*" { depth := 1; start_lex := get_info lexbuf; mcomment lexbuf; main lexbuf }
   | ['0'-'9']+ { Parser.INTV { i = get_info lexbuf; v = int_of_string (text lexbuf) } }
   | id { create_id (get_info lexbuf) (text lexbuf) }
   | "==" { create_id (get_info lexbuf) (text lexbuf) }
   | ['(' ')' '{' '}' ';' '=' '>' '+' '-' '*' '/' '&' ','] { create_id (get_info lexbuf) (text lexbuf) }
   | eof { Parser.EOF (get_info lexbuf) }
+  | _ { error (get_info lexbuf) "Illegal character" }
 
 and comment =
   parse
+  | eof { error (!start_lex) "Comment not terminated" }
   | [^ '\n'] { comment lexbuf }
   | "\n" { new_line lexbuf }
 
@@ -82,5 +86,6 @@ and mcomment =
   parse
   | "/*" { incr depth; mcomment lexbuf }
   | "*/" { decr depth; if !depth > 0 then mcomment lexbuf }
+  | eof { error (!start_lex) "Comment not terminated" }
   | [^ '\n'] { mcomment lexbuf }
   | "\n" { new_line lexbuf; mcomment lexbuf }
