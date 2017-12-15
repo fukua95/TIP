@@ -3,9 +3,11 @@ open Format
 open Ast
 
 let search_path = ref [""]
+let run_flag = ref false
 
 let arg_defs = [
   ("-I", Arg.String (fun f -> search_path := f :: !search_path), "Append a directory to the search path");
+  ("-run", Arg.Unit (fun () -> run_flag := true), "Run the program");
 ]
 
 let parse_args () =
@@ -37,8 +39,8 @@ let parse_file in_file =
 
 let main () =
   let in_file = parse_args () in
-  let _ = parse_file in_file in
-  ()
+  let prog = parse_file in_file in
+  if !run_flag then let _ = Interpreter.interp prog in ()
 
 let () = set_max_boxes 1000
 let () = set_margin 67
