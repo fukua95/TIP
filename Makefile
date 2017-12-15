@@ -22,3 +22,4 @@ debug: sanity
 
 sanity:
 	which menhir
+	ocamlfind query batteries
