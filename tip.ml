@@ -7,7 +7,7 @@ let run_flag = ref false
 
 let arg_defs = [
   ("-I", Arg.String (fun f -> search_path := f :: !search_path), "Append a directory to the search path");
-  ("-run", Arg.Unit (fun () -> run_flag := true), "Run the program");
+  ("-run", Arg.Set run_flag, "Run the program");
 ]
 
 let parse_args () =
