@@ -1,3 +1,5 @@
 S .
-B _build/
+S ast
+S interpreter
+B _build/**
 PKG batteries
