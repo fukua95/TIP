@@ -11,14 +11,14 @@ type ty =
   | TyInt
   | TyRef of ty
   | TyArrow of ty list * ty
-  | TyRec of int * ty
+  | TyRec of ty * ty
   | TyVar of entity
-  | TyFresh of int
+  | TyFresh of entity
 
 let analyze prog =
-  let fresh =
-    let counter = ref 0 in
-    fun () -> let res = !counter in incr counter; TyFresh res
+  let fresh = function
+    | TyVar en -> TyFresh en
+    | TyFresh en -> TyFresh en
   in
   let parent = Hashtbl.create 10 in
   let mk_set t = if not (Hashtbl.mem parent t) then Hashtbl.add parent t t in
@@ -61,8 +61,8 @@ let analyze prog =
     match exp with
     | ENumber _ -> unify (e2t exp) TyInt
     | EInput _ -> unify (e2t exp) TyInt
-    | EAlloc _ -> unify (e2t exp) (TyRef (fresh ()))
-    | ENull _ -> unify (e2t exp) (TyRef (fresh ()))
+    | EAlloc _ -> unify (e2t exp) (TyRef (fresh (e2t exp)))
+    | ENull _ -> unify (e2t exp) (TyRef (fresh (e2t exp)))
     | EUnop (Deref, target, _) -> unify (e2t target) (TyRef (e2t exp)); ce target
     | EUnop (Ref, target, _) -> unify (e2t exp) (TyRef (e2t target)); ce target
     | EBinop (Eqq, exp1, exp2, _) -> unify (e2t exp1) (e2t exp2); unify (e2t exp) TyInt; ce exp1; ce exp2
@@ -70,11 +70,11 @@ let analyze prog =
     | ECallFunc (callee, args, _, _) -> unify (e2t callee) (TyArrow (List.map e2t args, e2t exp)); ce callee; List.iter ce args
     | EIdentifier _ -> ()
   in
-  let rec collect_stmt env =
+  let rec collect_stmt env stmt =
     let cs = collect_stmt env in
     let ce = collect_exp env in
     let e2t = exp2ty env in
-    function
+    match stmt with
     | SAssign (lhs, rhs, _) -> unify (e2t lhs) (e2t rhs); ce lhs; ce rhs
     | SBlock (stmts, _) -> List.iter cs stmts
     | SIf (cond, th, el, _) -> unify (e2t cond) TyInt; ce cond; cs th; Option.may cs el
@@ -92,4 +92,50 @@ let analyze prog =
       collect_stmt env body;
       unify (TyVar (EnFunName fname)) (TyArrow (List.map (fun param -> TyVar (EnFunParam (fname, param))) params, exp2ty env ret));
       collect_exp env ret) prog;
-  failwith "TODO"
+  let sol = Hashtbl.filter (fun t ->
+      match t with
+      | TyVar _
+      | TyFresh _ -> true
+      | _ -> false) parent
+  in
+  let visited = Hashtbl.create 10 in
+  let rec appear_free_in v t =
+    match t with
+    | TyVar _
+    | TyFresh _ -> v = t
+    | TyInt -> false
+    | TyRef r -> appear_free_in v r
+    | TyArrow (args, res) -> List.for_all (appear_free_in v) args && appear_free_in v res
+    | TyRec (bv, body) -> bv <> v && appear_free_in v body
+  in
+  let rec subst x s t =
+    match t with
+    | TyVar _
+    | TyFresh _ -> if x = t then s else t
+    | TyInt -> TyInt
+    | TyRef r -> TyRef (subst x s r)
+    | TyArrow (args, res) -> TyArrow (List.map (subst x s) args, subst x s res)
+    | TyRec (bv, body) -> if bv = x then t else TyRec (bv, subst x s body)
+  in
+  let rec close t =
+    match t with
+    | TyVar _
+    | TyFresh _ ->
+      if (not (Hashtbl.mem visited t)) && (Hashtbl.find_option sol t <> Some t) then
+        (Hashtbl.add visited t true;
+         let cterm = close (Hashtbl.find sol t) in
+         let new_v = fresh t in
+         Hashtbl.remove visited t;
+         if appear_free_in new_v cterm then TyRec (new_v, subst t new_v cterm) else cterm)
+      else
+        fresh t
+    | TyInt -> TyInt
+    | TyRef r -> TyRef (close r)
+    | TyArrow (args, res) -> TyArrow (List.map close args, close res)
+    | TyRec (bv, body) -> TyRec (bv, close body)
+  in
+  let closed_sol = Hashtbl.filter_map (fun tf tt ->
+      match tf with
+      | TyVar en -> Some (close (TyVar en))
+      | _ -> None) sol in
+  Hashtbl.to_list closed_sol

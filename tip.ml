@@ -4,10 +4,12 @@ open Ast
 
 let search_path = ref [""]
 let run_flag = ref false
+let types_flag = ref false
 
 let arg_defs = [
   ("-I", Arg.String (fun f -> search_path := f :: !search_path), "Append a directory to the search path");
-  ("-run", Arg.Set run_flag, "Run the program");
+  ("-run", Arg.Set run_flag, "Run the program as the last step");
+  ("-types", Arg.Set types_flag, "Enable type analysis");
 ]
 
 let parse_args () =
@@ -40,6 +42,7 @@ let parse_file in_file =
 let main () =
   let in_file = parse_args () in
   let prog = parse_file in_file in
+  if !types_flag then let _ = Type_analysis.analyze prog in ();
   if !run_flag then let _ = Interpreter.interp prog in ()
 
 let () = set_max_boxes 1000
