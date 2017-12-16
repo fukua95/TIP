@@ -1,6 +1,6 @@
 .PHONY: all clean byte native profile debug sanity
 
-OCB_FLAGS = -use-ocamlfind -use-menhir -I ast -I interpreter
+OCB_FLAGS = -use-ocamlfind -use-menhir -I ast -I interpreter -I analysis
 OCB = ocamlbuild $(OCB_FLAGS)
 
 all: native byte

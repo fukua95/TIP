@@ -1,5 +1,6 @@
 S .
 S ast
 S interpreter
+S analysis
 B _build/**
 PKG batteries
